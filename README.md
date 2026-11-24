@@ -23,7 +23,8 @@ Dates are read as day/month/year (Bangladesh format). Times with no date, as Out
 2. Upload everything in this folder (keep the `icons` folder) to the repository root: **Add file → Upload files**, then commit.
 3. Go to **Settings → Pages**, set **Source: Deploy from a branch**, branch **main**, folder **/ (root)**, and save.
 4. After a minute the app is live at `https://<your-user>.github.io/awb-mail-checker/`.
-5. Open that link in Chrome or Edge and press **Install app** (or the install icon in the address bar).
+5. Open that link in Chrome or Edge and press **Install app**. If the browser doesn't show its own prompt, the button explains why
+   (opened as a file, missing files on GitHub, or a browser like Firefox) and shows the menu steps to install.
 
 ## Users and sign-in
 

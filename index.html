@@ -112,7 +112,7 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
 </section>
 
 <main id="app" class="hide">
-  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><span style="display:flex;gap:8px"><button class="btn hide" id="install" type="button">Install app</button><button class="btn" id="logout" type="button">Sign out</button></span></div></header>
+  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><span style="display:flex;gap:8px"><button class="btn" id="install" type="button">Install app</button><button class="btn" id="logout" type="button">Sign out</button></span></div></header>
 
   <div class="band">
     <h1>Which notification mails went out?</h1>
@@ -198,6 +198,13 @@ WHERE [Subject] Like "*Shipment Arrival Notification of*";</pre></li>
     <div class="scroll"><table class="stack" id="tbl"></table></div>
   </div>
 </main>
+<div id="instBox" class="hide" role="dialog" aria-modal="true" aria-labelledby="instT" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:16px;z-index:50">
+  <div class="card" style="width:min(520px,100%);max-height:90vh;overflow:auto">
+    <h2 id="instT">Install AWB Mail Checker</h2>
+    <div id="instBody" class="small" style="font-size:15px"></div>
+    <div style="text-align:right;margin-top:14px"><button class="btn" type="button" id="instClose">Close</button></div>
+  </div>
+</div>
 
 <script>
 {
@@ -450,8 +457,34 @@ $('sample').addEventListener('click',e=>{e.preventDefault();
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
   try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
 let deferred=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('install').classList.remove('hide')});
-$('install').addEventListener('click',async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;$('install').classList.add('hide')});
+const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+if(standalone())$('install').classList.add('hide');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e});
+async function installHelp(){
+  const ua=navigator.userAgent,ios=/iPhone|iPad|iPod/.test(ua),edge=/Edg\//.test(ua),chrome=/Chrome\//.test(ua)&&!edge,ff=/Firefox\//.test(ua);
+  const li=a=>'<ol>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ol>';let why='',how='';
+  if(location.protocol==='file:')why='<p><b>This page was opened as a file from your PC.</b> An app can only be installed from the website link, for example <code>https://&lt;your-username&gt;.github.io/&lt;repo&gt;/</code>. Open that link instead.</p>';
+  else if(location.protocol!=='https:'&&location.hostname!=='localhost')why='<p><b>The page is not on https.</b> Open the https:// GitHub Pages link.</p>';
+  else{
+    const probs=[];
+    try{const m=await fetch('manifest.webmanifest',{cache:'no-store'});if(!m.ok)probs.push('<code>manifest.webmanifest</code> was not found on the website');
+      else{const j=await m.json();for(const ic of j.icons||[]){const r=await fetch(ic.src,{cache:'no-store'});if(!r.ok)probs.push('<code>'+esc(ic.src)+'</code> was not found');}}}catch(e){probs.push('<code>manifest.webmanifest</code> could not be read')}
+    try{const r=await fetch('sw.js',{cache:'no-store'});if(!r.ok)probs.push('<code>sw.js</code> was not found on the website')}catch(e){probs.push('<code>sw.js</code> could not be read')}
+    if(probs.length)why='<p><b>Some app files are missing on GitHub:</b></p><ul>'+probs.map(x=>'<li>'+x+'</li>').join('')+'</ul><p>Upload them to the same folder as <code>index.html</code> (keep the <code>icons</code> folder), wait a minute, then reload.</p>';
+  }
+  if(ios)how=li(['Open the link in <b>Safari</b>.','Tap the <b>Share</b> button.','Tap <b>Add to Home Screen</b>, then <b>Add</b>.']);
+  else if(edge)how=li(['Click the <b>⋯</b> menu (top right).','Choose <b>Apps → Install this site as an app</b>.','Click <b>Install</b>.']);
+  else if(chrome)how=li(['Click the <b>install icon</b> at the right end of the address bar, or','Click the <b>⋮</b> menu → <b>Cast, save, and share → Install page as app</b>.','Click <b>Install</b>.']);
+  else if(ff)how='<p>Firefox on a computer cannot install web apps. Open the link in <b>Chrome</b> or <b>Edge</b>.</p>';
+  else how='<p>Open the link in <b>Chrome</b> or <b>Edge</b> and use the browser menu to install it.</p>';
+  $('instBody').innerHTML=(why||'<p>The browser did not offer the install prompt here, but you can install it from the menu:</p>')+(why&&location.protocol==='file:'?'':how)+'<p class="muted">If it is already installed, open it from the Start menu or taskbar instead.</p>';
+  $('instBox').classList.remove('hide');$('instClose').focus()}
+$('install').addEventListener('click',async()=>{
+  if(deferred){deferred.prompt();let ok=false;try{ok=(await deferred.userChoice).outcome==='accepted'}catch(e){}deferred=null;if(ok)$('install').classList.add('hide');return}
+  installHelp()});
+$('instClose').addEventListener('click',()=>$('instBox').classList.add('hide'));
+$('instBox').addEventListener('click',e=>{if(e.target.id==='instBox')$('instBox').classList.add('hide')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('instBox').classList.add('hide')});
 window.addEventListener('appinstalled',()=>$('install').classList.add('hide'));
 }
 </script>
