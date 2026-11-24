@@ -9,9 +9,11 @@ It runs entirely in the browser: files you load are never uploaded anywhere. Ins
 2. **Step 1 – mails.** In classic Outlook, open the folder where the group copies arrive and search `Shipment Arrival Notification`.
    Click one mail, press **Ctrl+A** then **Ctrl+C**, open **"Or paste the data instead"** and paste into the left box, then click **Use pasted data**.
    (An .xlsx / .csv exported from Access with *Subject* and *Received* columns also works as a file.)
-3. **Step 2 – tracking list.** Load the Excel (.xlsx) or .csv with your AWBs (a column named *AWB* or *Tracking* is picked automatically).
+3. **Step 2 – tracking list.** Load the Excel (.xlsx) with your AWBs. Only the sheet named **ALL NOA** is read (a .csv also works) (a column named *AWB* or *Tracking* is picked automatically).
 4. Optionally set **Mails from / to** to check one bulk send, then press **Check**.
 5. See **Missing / Shared / Extra / Sent more than once**, copy a list for Excel, or **Download Excel** with every list on its own sheet.
+
+Rows are ignored when the **In Folder** column contains "Sent" (your Sent Items copy).
 
 Dates are read as day/month/year (Bangladesh format). Times with no date, as Outlook shows for today's mails, count as today.
 

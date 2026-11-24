@@ -1,6 +1,6 @@
 // AWB Mail Checker service worker: lets the app open and work offline.
 // When you change index.html, raise VERSION so users get the new copy.
-const VERSION = 'awb-checker-v3';
+const VERSION = 'awb-checker-v8';
 const APP_SHELL = [
   './',
   './index.html',
