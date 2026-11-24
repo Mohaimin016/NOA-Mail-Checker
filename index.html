@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#16191c">
 <meta name="description" content="Check which Shipment Arrival Notification mails were sent and which AWBs are missing.">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AWB Checker">
@@ -470,7 +470,7 @@ async function installHelp(){
     try{const m=await fetch('manifest.webmanifest',{cache:'no-store'});if(!m.ok)probs.push('<code>manifest.webmanifest</code> was not found on the website');
       else{const j=await m.json();for(const ic of j.icons||[]){const r=await fetch(ic.src,{cache:'no-store'});if(!r.ok)probs.push('<code>'+esc(ic.src)+'</code> was not found');}}}catch(e){probs.push('<code>manifest.webmanifest</code> could not be read')}
     try{const r=await fetch('sw.js',{cache:'no-store'});if(!r.ok)probs.push('<code>sw.js</code> was not found on the website')}catch(e){probs.push('<code>sw.js</code> could not be read')}
-    if(probs.length)why='<p><b>Some app files are missing on GitHub:</b></p><ul>'+probs.map(x=>'<li>'+x+'</li>').join('')+'</ul><p>Upload them to the same folder as <code>index.html</code> (keep the <code>icons</code> folder), wait a minute, then reload.</p>';
+    if(probs.length)why='<p><b>Some app files are missing on GitHub:</b></p><ul>'+probs.map(x=>'<li>'+x+'</li>').join('')+'</ul><p>Upload them to the same folder as <code>index.html</code>, wait a minute, then reload.</p>';
   }
   if(ios)how=li(['Open the link in <b>Safari</b>.','Tap the <b>Share</b> button.','Tap <b>Add to Home Screen</b>, then <b>Add</b>.']);
   else if(edge)how=li(['Click the <b>⋯</b> menu (top right).','Choose <b>Apps → Install this site as an app</b>.','Click <b>Install</b>.']);

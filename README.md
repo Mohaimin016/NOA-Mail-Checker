@@ -20,7 +20,8 @@ Dates are read as day/month/year (Bangladesh format). Times with no date, as Out
 ## Publish on GitHub Pages
 
 1. Create a new repository on GitHub (e.g. `awb-mail-checker`).
-2. Upload everything in this folder (keep the `icons` folder) to the repository root: **Add file → Upload files**, then commit.
+2. Upload all 10 files in this folder to the repository root: **Add file → Upload files**, select every file (Ctrl+A), then commit.
+   There are no sub-folders. `.nojekyll` is hidden on some PCs; it's optional.
 3. Go to **Settings → Pages**, set **Source: Deploy from a branch**, branch **main**, folder **/ (root)**, and save.
 4. After a minute the app is live at `https://<your-user>.github.io/awb-mail-checker/`.
 5. Open that link in Chrome or Edge and press **Install app**. If the browser doesn't show its own prompt, the button explains why
@@ -54,5 +55,5 @@ After you change `index.html`, open `sw.js` and raise `VERSION` (e.g. `awb-check
 | `index.html` | The whole app |
 | `manifest.webmanifest` | App name, colours and icons for installing |
 | `sw.js` | Offline cache |
-| `icons/` | App icons |
+| `*.png` | App icons |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are |
