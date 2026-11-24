@@ -132,7 +132,7 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
       </div>
       <div class="drop" id="dropTrk">
         <div><span class="step">2</span><b>Your tracking numbers</b></div>
-        <div class="small muted" id="trkInfo">Drop or choose the Excel (.xlsx) / .csv with the AWBs you sent notifications for.</div>
+        <div class="small muted" id="trkInfo">Drop or choose the Excel (.xlsx) with the AWBs. Only the <b>ALL NOA</b> sheet is read.</div>
         <input type="file" id="fileTrk" accept=".xlsx,.csv,.txt" aria-label="Tracking number file">
         <div class="pick hide" id="pickTrk">
           <div><label for="colAwb">Tracking number column</label><select id="colAwb"></select></div>
@@ -247,10 +247,13 @@ async function unzip(buf){
 const xml=s=>new DOMParser().parseFromString(s,'application/xml');
 const tags=(n,t)=>[...n.getElementsByTagNameNS('*',t)];
 const numStr=v=>{const x=Number(v);return Number.isFinite(x)&&Number.isInteger(x)?x.toLocaleString('fullwide',{useGrouping:false}):v};
-async function readXlsx(buf){
+const sheetKey=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+async function readXlsx(buf,want){
   const z=await unzip(buf);
   const ss=z['xl/sharedStrings.xml']?tags(xml(await z['xl/sharedStrings.xml']()),'si').map(si=>tags(si,'t').filter(t=>t.parentNode.localName!=='rPh').map(t=>t.textContent).join('')):[];
-  const wb=xml(await z['xl/workbook.xml']()),sh=tags(wb,'sheet')[0];
+  const wb=xml(await z['xl/workbook.xml']()),all=tags(wb,'sheet');let sh=all[0];
+  if(want){sh=all.find(s=>sheetKey(s.getAttribute('name'))===sheetKey(want));
+    if(!sh)throw new Error(`No "${want}" sheet in this file. Sheets found: ${all.map(s=>s.getAttribute('name')).join(', ')}`)}
   const rid=sh.getAttribute('r:id')||sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
   let target='worksheets/sheet1.xml';
   if(z['xl/_rels/workbook.xml.rels']){const r=tags(xml(await z['xl/_rels/workbook.xml.rels']()),'Relationship').find(r=>r.getAttribute('Id')===rid);if(r)target=r.getAttribute('Target')}
@@ -278,10 +281,11 @@ function toTable(rows,name){
   const w=Math.max(...rows.map(r=>r.length));
   const headers=hasHead?Array.from({length:w},(_,i)=>String(rows[0][i]||'Column '+(i+1)).trim()):Array.from({length:w},(_,i)=>'Column '+String.fromCharCode(65+i%26));
   return{name,headers,rows:(hasHead?rows.slice(1):rows).map(r=>Array.from({length:w},(_,i)=>r[i]??''))}}
-async function readFile(f){
+async function readFile(f,want){
   if(/\.xls$/i.test(f.name))throw new Error('Old .xls format: please save it as .xlsx or .csv first');
   const buf=await f.arrayBuffer();
-  return toTable(/\.xlsx$/i.test(f.name)?await readXlsx(buf):readCsv(new TextDecoder().decode(buf)),f.name)}
+  const x=/\.xlsx$/i.test(f.name);
+  return toTable(x?await readXlsx(buf,want):readCsv(new TextDecoder().decode(buf)),f.name+(x&&want?' › '+want:''))}
 
 /* ---- AWB + date helpers ---- */
 const key=v=>{let s=String(v??'').toUpperCase().replace(/[^A-Z0-9]/g,'');return /^\d+$/.test(s)?(s.replace(/^0+/,'')||'0'):s};
@@ -321,7 +325,7 @@ for(const [inp,zone,fn] of [['fileMail','dropMail',setMail],['fileTrk','dropTrk'
   ['dragenter','dragover'].forEach(ev=>z.addEventListener(ev,()=>z.classList.add('hot')));
   ['dragleave','drop'].forEach(ev=>z.addEventListener(ev,()=>z.classList.remove('hot')));
   $(inp).addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;
-    try{say('Reading '+f.name+' …');fn(await readFile(f));if(!(mail&&trk))say('')}catch(err){say(err.message||'Could not read that file',true)}
+    try{say('Reading '+f.name+' …');fn(await readFile(f,inp==='fileTrk'?'ALL NOA':null));if(!(mail&&trk))say('')}catch(err){say(err.message||'Could not read that file',true)}
     e.target.value=''})}
 const linesTable=(txt,name,head)=>{let rows=txt.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split('\t').map(x=>x.trim()));
   const w=Math.max(...rows.map(r=>r.length));
