@@ -1,0 +1,17 @@
+{
+  "name": "AWB Mail Checker",
+  "short_name": "AWB Checker",
+  "description": "Check which Shipment Arrival Notification mails were sent and which AWBs are missing.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16191c",
+  "theme_color": "#16191c",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

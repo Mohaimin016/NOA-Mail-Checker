@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#16191c">
+<meta name="description" content="Check which Shipment Arrival Notification mails were sent and which AWBs are missing.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AWB Checker">
+<title>AWB Mail Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: operations tool, clinical, fast to read at a glance.
+   IDEA: a control-room board: one alarm readout (missing AWBs) and status strips.
+   PICTURE: the big Missing readout with a coverage bar, then the working tables.
+   COLOUR and TYPE: steel panel, black ink, white cards, alarm red for missing; Inter Tight + Inter.
+   LAYOUT: login card; then load strip (two drop zones), readout 40% + strips, tabs and table. */
+:root{color-scheme:light dark;
+--bg:light-dark(#d5dbe0,#16191c);--panel:light-dark(#ffffff,#1f2327);--ink:light-dark(#0d0f11,#eef1f3);
+--mute:light-dark(#56606a,#9aa4ad);--line:light-dark(#c3cbd2,#2f353b);--red:#e8251a;--ok:light-dark(#1f7a45,#4cc27f);
+--amber:light-dark(#9a6200,#f0b24a);--soft:light-dark(#eef1f4,#262b30)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3,.big{font-family:"Inter Tight",Inter,system-ui,sans-serif}
+h1{font-size:clamp(26px,3.4vw,40px);line-height:1.05;margin:0;text-wrap:balance;font-weight:700}
+h2{font-size:20px;margin:0 0 4px}
+.band{padding:clamp(20px,3vw,40px) max(4vw,16px);max-width:1240px;margin:0 auto}
+.muted{color:var(--mute)}.small{font-size:13px}
+button,select,input{font:inherit;font-size:16px}
+.btn{min-height:44px;padding:0 18px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--panel);font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,input:focus-visible,.drop:focus-within,.tab:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+input[type=text],input[type=password],input[type=datetime-local],input[type=search],select,textarea{min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+textarea{font:14px/1.4 ui-monospace,Consolas,monospace;min-height:110px}
+label{font-size:14px;font-weight:600;display:block;margin:0 0 4px}
+/* login */
+#login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:clamp(20px,3vw,32px)}
+#login .card{width:min(420px,100%);display:grid;gap:14px}
+#loginErr{color:var(--red);font-size:14px;min-height:1.2em;margin:0}
+/* app */
+header{background:var(--ink);color:var(--panel)}
+header .band{display:flex;gap:12px;align-items:center;justify-content:space-between;padding-block:14px;flex-wrap:wrap}
+header b{font-family:"Inter Tight";font-size:18px}
+header .btn{background:transparent;color:var(--panel);border-color:currentColor;min-height:38px}
+.load{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.drop{position:relative;border:2px dashed var(--line);border-radius:12px;padding:18px;background:var(--panel);display:grid;gap:10px}
+.drop.hot{border-color:var(--red)}
+.drop.done{border-style:solid;border-color:var(--ok)}
+.drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--panel);font-weight:700;font-size:14px;margin-right:8px}
+.fname{font-weight:600;overflow-wrap:anywhere}
+.pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;position:relative;z-index:1}
+.opts{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr auto;gap:12px;align-items:end;margin-top:16px}
+details{margin-top:12px}summary{cursor:pointer;font-weight:600;min-height:32px}
+details .card{margin-top:8px}
+ol{padding-left:20px;margin:6px 0}code{background:var(--soft);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere;font-size:14px}
+pre{overflow-x:auto;background:var(--soft);padding:10px;border-radius:8px;font-size:13px}
+/* readout */
+.board{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:16px}
+.readout{background:var(--ink);color:var(--panel);border-radius:14px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;gap:16px}
+.readout .big{font-size:clamp(64px,10vw,120px);line-height:.9;font-weight:700;color:var(--red)}
+.readout.clear .big{color:#4cc27f}
+.meter{height:12px;background:#3a4047;border-radius:6px;overflow:hidden}
+.meter i{display:block;height:100%;background:#4cc27f;width:0;transition:width .6s}
+.strips{display:grid;gap:10px}
+.strip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.strip .n{font:700 28px "Inter Tight",sans-serif;white-space:nowrap}
+.strip.ok .n{color:var(--ok)}.strip.warn .n{color:var(--amber)}
+/* tabs + table */
+.tabs{display:flex;gap:6px;overflow-x:auto;border-bottom:2px solid var(--ink);margin-top:24px}
+.tab{min-height:44px;padding:0 16px;border:0;background:transparent;color:var(--mute);font-weight:600;cursor:pointer;border-radius:8px 8px 0 0;white-space:nowrap;flex:none}
+.tab[aria-selected=true]{background:var(--ink);color:var(--panel)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.bar input{flex:1 1 220px;width:auto}
+.scroll{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;color:var(--mute);font-weight:600;background:var(--soft);position:sticky;top:0}
+td.awb{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
+.empty{padding:28px;text-align:center;color:var(--mute)}
+#msg{min-height:1.4em;font-size:14px;margin:8px 0 0}
+#msg.err{color:var(--red)}
+.hide{display:none!important}
+@media(max-width:860px){.opts{grid-template-columns:1fr 1fr}.board{grid-template-columns:1fr}}
+@media(max-width:600px){.load,.opts{grid-template-columns:1fr}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 12px;padding-inline-start:8em;text-align:start;white-space:normal}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;color:var(--mute)}.stack td:empty{display:none}}
+@media(prefers-reduced-motion:reduce){.meter i{transition:none}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+
+<section id="login">
+  <form class="card" id="loginForm" autocomplete="off">
+    <div><h1>AWB Mail Checker</h1><p class="muted small" style="margin:6px 0 0">Shipment Arrival Notification: shared vs missing</p></div>
+    <div><label for="u">Email ID</label><input type="email" id="u" autocomplete="username" required></div>
+    <div><label for="p">Password</label><input type="password" id="p" autocomplete="current-password" required></div>
+    <p id="loginErr" role="alert"></p>
+    <button class="btn" type="submit">Sign in</button>
+  </form>
+</section>
+
+<main id="app" class="hide">
+  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><span style="display:flex;gap:8px"><button class="btn hide" id="install" type="button">Install app</button><button class="btn" id="logout" type="button">Sign out</button></span></div></header>
+
+  <div class="band">
+    <h1>Which notification mails went out?</h1>
+    <p class="muted" style="margin:8px 0 20px">Load the Access export of the group mailbox and your tracking list. The check runs in this browser only; nothing is uploaded anywhere.</p>
+
+    <div class="load">
+      <div class="drop" id="dropMail">
+        <div><span class="step">1</span><b>Access export: group mails</b></div>
+        <div class="small muted" id="mailInfo">Drop or choose the .xlsx / .csv exported from your Access query (Subject + Received).</div>
+        <input type="file" id="fileMail" accept=".xlsx,.csv,.txt" aria-label="Access export file">
+        <div class="pick hide" id="pickMail">
+          <div><label for="colSubj">Subject column</label><select id="colSubj"></select></div>
+          <div><label for="colDate">Received column</label><select id="colDate"></select></div>
+          <div><label for="colFolder">Folder column</label><select id="colFolder"></select></div>
+        </div>
+      </div>
+      <div class="drop" id="dropTrk">
+        <div><span class="step">2</span><b>Your tracking numbers</b></div>
+        <div class="small muted" id="trkInfo">Drop or choose the Excel (.xlsx) / .csv with the AWBs you sent notifications for.</div>
+        <input type="file" id="fileTrk" accept=".xlsx,.csv,.txt" aria-label="Tracking number file">
+        <div class="pick hide" id="pickTrk">
+          <div><label for="colAwb">Tracking number column</label><select id="colAwb"></select></div>
+        </div>
+      </div>
+    </div>
+
+    <details><summary>Or paste the data instead</summary>
+      <div class="card load" style="display:grid">
+        <div><label for="pasteMail">Mails copied from Outlook (select mails → Ctrl+A → Ctrl+C), or subjects one per line</label><textarea id="pasteMail"></textarea></div>
+        <div><label for="pasteTrk">Tracking numbers (one per line)</label><textarea id="pasteTrk"></textarea></div>
+        <div><button class="btn ghost" type="button" id="usePaste">Use pasted data</button></div>
+      </div>
+    </details>
+
+    <div class="opts">
+      <div><label for="phrase">Subject text before the AWB</label><input type="text" id="phrase" value="Shipment Arrival Notification of"></div>
+      <div><label for="ignFolder">Ignore folder containing</label><input type="text" id="ignFolder" value="Sent"></div>
+      <div><label for="dFrom">Mails from</label><input type="datetime-local" id="dFrom"></div>
+      <div><label for="dTo">Mails to</label><input type="datetime-local" id="dTo"></div>
+      <button class="btn" type="button" id="run" disabled>Check</button>
+    </div>
+    <p id="msg" role="status"></p>
+    <p class="small muted" style="margin:4px 0 0"><a href="#" id="sample" style="color:inherit">Try it with sample data</a> · sample data is made up for testing only</p>
+
+    <details><summary>How to make the Access export (one-time setup)</summary>
+      <div class="card small">
+        <ol>
+          <li>In Access: <b>External Data → New Data Source → From Other Sources → Outlook Folder → Link</b>, and pick the folder where the group-mail copies land.</li>
+          <li>Create a query (e.g. <code>qryArrivalMails</code>):
+            <pre>SELECT [Subject], [Received]
+FROM [GroupInbox]
+WHERE [Subject] Like "*Shipment Arrival Notification of*";</pre></li>
+          <li>Run it, then <b>External Data → Export → Excel</b>, and tick <b>Save export steps</b>.</li>
+          <li>Each time you check: <b>External Data → Saved Exports → Run</b>, then load that file here as step 1.</li>
+        </ol>
+        <p style="margin:6px 0 0">The linked Outlook table works with classic Outlook on Windows. The .accdb file itself can't be read by a browser, so the export is the bridge.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="band hide" id="results" style="padding-top:0">
+    <div class="board">
+      <div class="readout" id="readout">
+        <div><div class="small" style="opacity:.75">Missing: no mail found</div><div class="big" id="nMissing">0</div><div id="ofLine" style="opacity:.85"></div></div>
+        <div><div class="meter"><i id="meter"></i></div><div class="small" id="pctLine" style="margin-top:6px;opacity:.85"></div></div>
+      </div>
+      <div class="strips">
+        <div class="strip ok"><div><b>Shared</b><div class="small muted">In your list and a mail reached the group</div></div><span class="n" id="nShared">0</span></div>
+        <div class="strip warn"><div><b>Extra</b><div class="small muted">Mail sent, but AWB not in your list</div></div><span class="n" id="nExtra">0</span></div>
+        <div class="strip warn"><div><b>Sent more than once</b><div class="small muted">Same AWB in two or more mails</div></div><span class="n" id="nDup">0</span></div>
+        <div class="strip"><div><b>Mails scanned</b><div class="small muted" id="scanLine"></div></div><span class="n" id="nScan">0</span></div>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="bar">
+      <input type="search" id="q" placeholder="Search AWB or subject" aria-label="Search">
+      <button class="btn ghost" type="button" id="copy">Copy for Excel</button>
+      <button class="btn" type="button" id="dl">Download Excel</button>
+    </div>
+    <div class="scroll"><table class="stack" id="tbl"></table></div>
+  </div>
+</main>
+
+<script>
+{
+/* ===== Sign-in: users are stored as salted PBKDF2 hashes, never as plain passwords.
+   To add a user: open the app, press F12 > Console, run  awbHash('email','password')
+   and paste the line it prints into this list. ===== */
+const USERS=[{"user":"mohaimin.siddike@bdexpress.com","salt":"586f7d2f181ad09dee7b9bd714716ca8","hash":"2329cb5932966fee9bc56595e03a0f29906bc6fefa54a283d10fa5ed9cade3fc"},{"user":"asaduzzaman@bdexpress.com","salt":"0cead8453c34c33bb5f357d33f8f8991","hash":"0f6fbae213265a93021a017c882330401171a3649ede6903067d2a1198865328"},{"user":"md.sohel@bdexpress.com","salt":"e72b4353939cd330a8c05011c53ec67a","hash":"e15978f39b3df1c73803cd498dfd7517e8f79afc6c50c503b318c8359d47fdfe"}];
+const ITER=150000;
+
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const say=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
+let mail=null,trk=null,R=null,tab='missing';
+
+/* ---- login ---- */
+const show=u=>{$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent='Signed in as '+u};
+try{const u=sessionStorage.getItem('awbUser');if(u)show(u)}catch(e){}
+const hex2b=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16))),b2hex=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function pbk(pass,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveBits']);
+  return b2hex(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:hex2b(salt),iterations:ITER},k,256))}
+window.awbHash=async(u,p)=>{const s=b2hex(crypto.getRandomValues(new Uint8Array(16))),line=JSON.stringify({user:String(u).trim().toLowerCase(),salt:s,hash:await pbk(p,s)});console.log(line+',');return line};
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();
+  const u=$('u').value.trim().toLowerCase(),p=$('p').value,btn=e.submitter;
+  if(!(window.crypto&&crypto.subtle)){$('loginErr').textContent='Sign-in needs a secure page: open the app over https or from your PC.';return}
+  $('loginErr').textContent='';if(btn)btn.disabled=true;
+  try{const x=USERS.find(x=>x.user===u);
+    if(x&&await pbk(p,x.salt)===x.hash){try{sessionStorage.setItem('awbUser',u)}catch(e){}show(u);$('p').value=''}
+    else $('loginErr').textContent='Email ID or password is wrong.'}
+  catch(err){$('loginErr').textContent='Sign-in failed in this browser.'}
+  finally{if(btn)btn.disabled=false}});
+$('logout').addEventListener('click',()=>{try{sessionStorage.removeItem('awbUser')}catch(e){}location.reload()});
+
+/* ---- file reading: xlsx (zip) and csv ---- */
+async function inflate(bytes){return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+async function unzip(buf){
+  const dv=new DataView(buf),u8=new Uint8Array(buf),td=new TextDecoder(),out={};
+  let e=buf.byteLength-22;while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  if(e<0)throw new Error('Not a valid .xlsx file');
+  let p=dv.getUint32(e+16,true);const n=dv.getUint16(e+10,true);
+  for(let i=0;i<n;i++){
+    const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    const name=td.decode(u8.subarray(p+46,p+46+nl));
+    const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=u8.subarray(ds,ds+cs);
+    out[name]=async()=>td.decode(m===8?await inflate(raw):raw);
+    p+=46+nl+xl+cl}
+  return out}
+const xml=s=>new DOMParser().parseFromString(s,'application/xml');
+const tags=(n,t)=>[...n.getElementsByTagNameNS('*',t)];
+const numStr=v=>{const x=Number(v);return Number.isFinite(x)&&Number.isInteger(x)?x.toLocaleString('fullwide',{useGrouping:false}):v};
+async function readXlsx(buf){
+  const z=await unzip(buf);
+  const ss=z['xl/sharedStrings.xml']?tags(xml(await z['xl/sharedStrings.xml']()),'si').map(si=>tags(si,'t').filter(t=>t.parentNode.localName!=='rPh').map(t=>t.textContent).join('')):[];
+  const wb=xml(await z['xl/workbook.xml']()),sh=tags(wb,'sheet')[0];
+  const rid=sh.getAttribute('r:id')||sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+  let target='worksheets/sheet1.xml';
+  if(z['xl/_rels/workbook.xml.rels']){const r=tags(xml(await z['xl/_rels/workbook.xml.rels']()),'Relationship').find(r=>r.getAttribute('Id')===rid);if(r)target=r.getAttribute('Target')}
+  const path=target.startsWith('/')?target.slice(1):'xl/'+target.replace(/^\.\//,'');
+  const doc=xml(await (z[path]||z['xl/worksheets/sheet1.xml'])()),rows=[];
+  for(const row of tags(doc,'row')){const r=[];let ci=0;
+    for(const c of tags(row,'c')){
+      const ref=c.getAttribute('r');if(ref){const L=ref.match(/^[A-Z]+/)[0];ci=[...L].reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0)-1}
+      const t=c.getAttribute('t'),v=tags(c,'v')[0]?.textContent??'';
+      r[ci]=t==='s'?ss[+v]??'':t==='inlineStr'?tags(c,'t').map(x=>x.textContent).join(''):t==='str'||t==='b'||t==='e'?v:(v===''?'':numStr(v));ci++}
+    rows[(+row.getAttribute('r')||rows.length+1)-1]=Array.from(r,x=>x??'')}
+  return rows.filter(Boolean)}
+function readCsv(text){
+  const first=text.split(/\r?\n/)[0],d=[',',';','\t'].sort((a,b)=>first.split(b).length-first.split(a).length)[0];
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===d){row.push(f);f=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}
+    else f+=c}
+  if(f||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(x=>String(x).trim()!==''))}
+function toTable(rows,name){
+  const hasHead=rows.length>1&&!rows[0].some(v=>/^\d{8,}$/.test(String(v).replace(/\s/g,'')));
+  const w=Math.max(...rows.map(r=>r.length));
+  const headers=hasHead?Array.from({length:w},(_,i)=>String(rows[0][i]||'Column '+(i+1)).trim()):Array.from({length:w},(_,i)=>'Column '+String.fromCharCode(65+i%26));
+  return{name,headers,rows:(hasHead?rows.slice(1):rows).map(r=>Array.from({length:w},(_,i)=>r[i]??''))}}
+async function readFile(f){
+  if(/\.xls$/i.test(f.name))throw new Error('Old .xls format: please save it as .xlsx or .csv first');
+  const buf=await f.arrayBuffer();
+  return toTable(/\.xlsx$/i.test(f.name)?await readXlsx(buf):readCsv(new TextDecoder().decode(buf)),f.name)}
+
+/* ---- AWB + date helpers ---- */
+const key=v=>{let s=String(v??'').toUpperCase().replace(/[^A-Z0-9]/g,'');return /^\d+$/.test(s)?(s.replace(/^0+/,'')||'0'):s};
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function parseDate(v){
+  if(v===''||v==null)return null;const s=String(v).trim().replace(/^[A-Za-z]{3,9},?\s+(?=\d)/,'');
+  const tm=s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)?$/i);
+  if(tm){const n=new Date();let h=+tm[1];if(tm[3])h=h%12+(/p/i.test(tm[3])?12:0);return new Date(n.getFullYear(),n.getMonth(),n.getDate(),h,+tm[2])}
+  if(/^\d{4,5}(\.\d+)?$/.test(s)){const d=new Date((+s-25569)*864e5);return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),d.getUTCHours(),d.getUTCMinutes(),d.getUTCSeconds())}
+  let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?)?/i);
+  if(m){let a=+m[1],b=+m[2],y=+m[3];if(y<100)y+=2000;let D=a,M=b;if(b>12){D=b;M=a}
+    let h=+(m[4]||0);if(m[7]){h=h%12+(/p/i.test(m[7])?12:0)}return new Date(y,M-1,D,h,+(m[5]||0),+(m[6]||0))}
+  const t=Date.parse(s);return isNaN(t)?null:new Date(t)}
+const fmt=d=>d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'';
+
+/* ---- loading + column pickers ---- */
+function opts(sel,headers,pick,none){sel.innerHTML=(none?'<option value="-1">(none)</option>':'')+headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');sel.value=String(pick)}
+function setMail(t){mail=t;
+  const ph=$('phrase').value.trim().toLowerCase();
+  let s=t.headers.findIndex(h=>/subject/i.test(h));
+  if(s<0){const sc=t.headers.map((_,i)=>t.rows.filter(r=>String(r[i]).toLowerCase().includes(ph)).length);s=sc.indexOf(Math.max(...sc))}
+  opts($('colSubj'),t.headers,s,false);opts($('colDate'),t.headers,t.headers.findIndex(h=>/receiv|date|time|sent/i.test(h)&&!/folder/i.test(h)),true);
+  opts($('colFolder'),t.headers,t.headers.findIndex(h=>/folder/i.test(h)),true);
+  $('pickMail').classList.remove('hide');$('dropMail').classList.add('done');
+  $('mailInfo').innerHTML=`<span class="fname">${esc(t.name)}</span> · ${t.rows.length} rows`;ready()}
+function setTrk(t){trk=t;
+  let a=t.headers.findIndex(h=>/awb|track|hawb|mawb|shipment|consign/i.test(h));
+  if(a<0){const sc=t.headers.map((_,i)=>t.rows.filter(r=>/^\d{8,}$/.test(String(r[i]).replace(/\s/g,''))).length);a=sc.indexOf(Math.max(...sc))}
+  opts($('colAwb'),t.headers,a,false);
+  $('pickTrk').classList.remove('hide');$('dropTrk').classList.add('done');
+  $('trkInfo').innerHTML=`<span class="fname">${esc(t.name)}</span> · ${t.rows.length} rows`;ready()}
+function ready(){$('run').disabled=!(mail&&trk);if(mail&&trk)say('Both files loaded. Press Check.')}
+for(const [inp,zone,fn] of [['fileMail','dropMail',setMail],['fileTrk','dropTrk',setTrk]]){
+  const z=$(zone);
+  ['dragenter','dragover'].forEach(ev=>z.addEventListener(ev,()=>z.classList.add('hot')));
+  ['dragleave','drop'].forEach(ev=>z.addEventListener(ev,()=>z.classList.remove('hot')));
+  $(inp).addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;
+    try{say('Reading '+f.name+' …');fn(await readFile(f));if(!(mail&&trk))say('')}catch(err){say(err.message||'Could not read that file',true)}
+    e.target.value=''})}
+const linesTable=(txt,name,head)=>{let rows=txt.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split('\t').map(x=>x.trim()));
+  const w=Math.max(...rows.map(r=>r.length));
+  if(rows[0]&&rows[0].some(c=>/^(subject|awb|tracking)/i.test(c))&&rows.length>1){const h=rows[0];return{name,headers:Array.from({length:w},(_,i)=>h[i]||'Column '+(i+1)),rows:rows.slice(1)}}
+  return{name,headers:w>1?Array.from({length:w},(_,i)=>'Column '+(i+1)):[head],rows}};
+$('usePaste').addEventListener('click',()=>{
+  if($('pasteMail').value.trim())setMail(linesTable($('pasteMail').value,'Pasted mails','Subject'));
+  if($('pasteTrk').value.trim())setTrk(linesTable($('pasteTrk').value,'Pasted list','AWB'));
+  if(!(mail&&trk))say('Paste both the subjects and the tracking numbers.',true)});
+
+/* ---- compare ---- */
+function run(){
+  const ph=$('phrase').value.trim();if(!ph){say('Enter the subject text that comes before the AWB.',true);return}
+  const re=new RegExp(reEsc(ph).replace(/\s+/g,'\\s+')+'\\s*[:#\\-]?\\s*([A-Za-z0-9]+)','i');
+  const si=+$('colSubj').value,di=+$('colDate').value,ai=+$('colAwb').value;
+  const from=$('dFrom').value?new Date($('dFrom').value):null,to=$('dTo').value?new Date($('dTo').value):null;
+  const fi=+$('colFolder').value,ign=$('ignFolder').value.trim().toLowerCase();
+  const sent=new Map();let matched=0,outRange=0,skipped=0;
+  for(const r of mail.rows){const subj=String(r[si]??''),m=subj.match(re);if(!m)continue;
+    if(ign&&(fi>=0?String(r[fi]??'').toLowerCase().includes(ign):r.some((c,i)=>i!==si&&/^sent items$/i.test(String(c).trim())))){skipped++;continue}
+    const d=di>=0?parseDate(r[di]):null;
+    if(d&&((from&&d<from)||(to&&d>to))){outRange++;continue}
+    matched++;const k=key(m[1]);if(!sent.has(k))sent.set(k,{awb:m[1],mails:[]});sent.get(k).mails.push({subj,d})}
+  const list=new Map();
+  trk.rows.forEach((r,i)=>{const raw=String(r[ai]??'').trim(),k=key(raw);if(k&&!list.has(k))list.set(k,{awb:raw,row:i+(trk.headers[0].startsWith('Column ')?1:2)})});
+  const sortT=a=>a.sort((x,y)=>(x.d?.getTime()||0)-(y.d?.getTime()||0));
+  R={total:mail.rows.length,matched,outRange,skipped,list:list.size,
+    missing:[...list].filter(([k])=>!sent.has(k)).map(([,v])=>v),
+    shared:[...list].filter(([k])=>sent.has(k)).map(([k,v])=>{const ms=sortT(sent.get(k).mails);return{awb:v.awb,first:fmt(ms[0].d),times:ms.length}}),
+    extra:[...sent].filter(([k])=>!list.has(k)).map(([,v])=>{const ms=sortT(v.mails);return{awb:v.awb,first:fmt(ms[0].d),subj:ms[0].subj,times:ms.length}}),
+    dup:[...sent].filter(([,v])=>v.mails.length>1).map(([k,v])=>({awb:list.get(k)?.awb||v.awb,times:v.mails.length,when:sortT(v.mails).map(x=>fmt(x.d)||'no date').join(', '),inList:list.has(k)?'Yes':'No'}))};
+  $('results').classList.remove('hide');
+  $('nMissing').textContent=R.missing.length;$('readout').classList.toggle('clear',!R.missing.length);
+  $('ofLine').textContent=`of ${R.list} tracking numbers in your list`;
+  const pct=R.list?Math.round(R.shared.length/R.list*1000)/10:0;
+  $('meter').style.width=pct+'%';$('pctLine').textContent=`${pct}% shared (${R.shared.length} of ${R.list})`;
+  $('nShared').textContent=R.shared.length;$('nExtra').textContent=R.extra.length;$('nDup').textContent=R.dup.length;$('nScan').textContent=R.matched;
+  $('scanLine').textContent=`${R.matched} notification mails of ${R.total} rows`+(R.skipped?`; ${R.skipped} from Sent Items ignored`:'')+(R.outRange?`; ${R.outRange} outside the date range`:'');
+  if(!R.matched)say('No subjects matched "'+ph+'". Check the subject column and the subject text.',true);
+  else if(fi<0&&!R.skipped&&R.dup.length&&R.dup.length>=R.shared.length*0.8)say('Almost every AWB appears twice. Your paste may include Sent Items: add the "In Folder" column in Outlook (or search only the inbox) so sent copies can be ignored.',true);
+  else say(R.missing.length?`${R.missing.length} AWB without a mail. See the Missing tab.`:'All AWBs in your list have a mail.');
+  tab='missing';drawTabs();draw();$('results').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
+$('run').addEventListener('click',run);
+
+/* ---- tabs + table ---- */
+const VIEWS={
+  missing:{label:'Missing',cols:['Tracking number','Row in your file'],row:r=>[r.awb,r.row]},
+  shared:{label:'Shared',cols:['Tracking number','First mail received','Mails'],row:r=>[r.awb,r.first,r.times]},
+  extra:{label:'Extra',cols:['Tracking number','First mail received','Mails','Subject'],row:r=>[r.awb,r.first,r.times,r.subj]},
+  dup:{label:'Sent more than once',cols:['Tracking number','Mails','Received','In your list'],row:r=>[r.awb,r.times,r.when,r.inList]}};
+function drawTabs(){$('tabs').innerHTML=Object.entries(VIEWS).map(([k,v])=>`<button class="tab" role="tab" type="button" data-k="${k}" aria-selected="${k===tab}">${v.label} (${R[k].length})</button>`).join('')}
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;tab=b.dataset.k;drawTabs();draw()});
+const viewRows=()=>{const q=$('q').value.trim().toLowerCase(),v=VIEWS[tab];return R[tab].map(v.row).filter(r=>!q||r.join(' ').toLowerCase().includes(q))};
+function draw(){const v=VIEWS[tab],rows=viewRows();
+  $('tbl').innerHTML=`<thead><tr>${v.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`+
+    (rows.length?rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i?(/received|first/i.test(v.cols[i])?'t':''):'awb'}">${esc(c)}</td>`).join('')}</tr>`).join('')
+    :`<tr><td colspan="${v.cols.length}" class="empty">${$('q').value?'No match for this search.':'Nothing here.'}</td></tr>`)+'</tbody>'}
+$('q').addEventListener('input',()=>R&&draw());
+
+/* ---- copy + xlsx export ---- */
+$('copy').addEventListener('click',async()=>{const v=VIEWS[tab];
+  const txt=[v.cols,...viewRows()].map(r=>r.map(c=>String(c).replace(/[\t\n]/g,' ')).join('\t')).join('\n');
+  try{await navigator.clipboard.writeText(txt);say(`Copied ${viewRows().length} rows. Paste into Excel.`)}catch(e){say('Copy was blocked by the browser.',true)}});
+const crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=b=>{let c=0xFFFFFFFF;for(const x of b)c=crcT[(c^x)&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
+function zip(files){const te=new TextEncoder(),parts=[],cen=[];let off=0;
+  for(const [name,str] of files){const n=te.encode(name),d=te.encode(str),c=crc32(d);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint32(14,c,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,n.length,true);
+    parts.push(h,n,d);
+    const e=new DataView(new ArrayBuffer(46));e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint32(16,c,true);e.setUint32(20,d.length,true);e.setUint32(24,d.length,true);e.setUint16(28,n.length,true);e.setUint32(42,off,true);
+    cen.push(e,n);off+=30+n.length+d.length}
+  const cs=cen.reduce((a,x)=>a+x.byteLength,0),end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);end.setUint32(12,cs,true);end.setUint32(16,off,true);
+  return new Blob([...parts,...cen,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+const xe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
+const sheetXml=rows=>`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="4" width="24" customWidth="1"/></cols><sheetData>${rows.map((r,i)=>`<row r="${i+1}">${r.map(c=>typeof c==='number'?`<c t="n"${i?'':' s="1"'}><v>${c}</v></c>`:`<c t="inlineStr"${i?'':' s="1"'}><is><t xml:space="preserve">${xe(c)}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`;
+$('dl').addEventListener('click',()=>{if(!R)return;
+  const sheets=[['Summary',[['Item','Count'],['Tracking numbers in list',R.list],['Shared',R.shared.length],['Missing',R.missing.length],['Extra (not in list)',R.extra.length],['Sent more than once',R.dup.length],['Notification mails scanned',R.matched],['Sent Items mails ignored',R.skipped],['Checked at',fmt(new Date())]]],
+    ...Object.entries(VIEWS).map(([k,v])=>[v.label,[v.cols,...R[k].map(v.row)]])];
+  const ns='http://schemas.openxmlformats.org/';
+  const files=[['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="${ns}package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
+    ['_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${ns}package/2006/relationships"><Relationship Id="rId1" Type="${ns}officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${ns}spreadsheetml/2006/main" xmlns:r="${ns}officeDocument/2006/relationships"><sheets>${sheets.map((s,i)=>`<sheet name="${xe(s[0])}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${ns}package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${ns}officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="${ns}officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${ns}spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>`],
+    ...sheets.map((s,i)=>[`xl/worksheets/sheet${i+1}.xml`,sheetXml(s[1])])];
+  const d=new Date(),fname=`AWB-mail-check_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.xlsx`,blob=zip(files);
+  if(DL){DL.save({filename:fname,data:blob}).then(()=>say('Excel file saved.')).catch(e=>say(e&&e.code==='declined'?'Download cancelled.':'Download is not available here. Use Copy for Excel instead.',!(e&&e.code==='declined')));return}
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;
+    document.body.appendChild(a);a.click();a.remove();say('Excel file downloaded.')}
+  catch(e){say('Download was blocked here. Use Copy for Excel instead.',true)}});
+let DL=null;
+try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(x=>{DL=x}).catch(()=>{})}catch(e){}
+
+/* ---- sample data (made up) ---- */
+$('sample').addEventListener('click',e=>{e.preventDefault();
+  const base=['123456789076','123456789077','123456789078','123456789079','123456789080','123456789081','123456789082','123456789083','123456789084','123456789085'];
+  const t='2026-11-24 ';
+  setMail({name:'Sample Access export',headers:['Subject','Received'],rows:[
+    ['Shipment Arrival Notification of 123456789076(Tracking number)',t+'09:02'],['Shipment Arrival Notification of 123456789077',t+'09:02'],
+    ['RE: Pickup request for Gulshan office',t+'09:05'],['Shipment Arrival Notification of 123456789078',t+'09:03'],
+    ['Shipment Arrival Notification of 123456789079',t+'09:03'],['Shipment Arrival Notification of 123456789081',t+'09:04'],
+    ['Shipment Arrival Notification of 123456789082',t+'09:04'],['Shipment Arrival Notification of 123456789082',t+'09:11'],
+    ['Weekly KPI report',t+'09:20'],['Shipment Arrival Notification of 123456789083',t+'09:05'],
+    ['Shipment Arrival Notification of 123456789085',t+'09:06'],['Shipment Arrival Notification of 123456789099',t+'09:06']]});
+  setTrk({name:'Sample tracking list',headers:['AWB','Consignee'],rows:base.map((a,i)=>[a,'Consignee '+(i+1)])});
+  run()});
+/* ---- PWA: offline cache + install button ---- */
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+let deferred=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('install').classList.remove('hide')});
+$('install').addEventListener('click',async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;$('install').classList.add('hide')});
+window.addEventListener('appinstalled',()=>$('install').classList.add('hide'));
+}
+</script>
+</body>
+</html>
