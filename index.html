@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#16191c">
+<meta name="theme-color" content="#0f1e33">
 <meta name="description" content="Check which Shipment Arrival Notification mails were sent and which AWBs are missing.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -37,7 +37,7 @@ button,select,input{font:inherit;font-size:16px}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:focus-visible,select:focus-visible,input:focus-visible,.drop:focus-within,.tab:focus-visible{outline:3px solid var(--red);outline-offset:2px}
-input[type=text],input[type=password],input[type=datetime-local],input[type=search],select,textarea{min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+input[type=text],input[type=password],input[type=date],input[type=search],select,textarea{min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
 textarea{font:14px/1.4 ui-monospace,Consolas,monospace;min-height:110px}
 label{font-size:14px;font-weight:600;display:block;margin:0 0 4px}
 /* login */
@@ -96,6 +96,16 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
 @media(max-width:860px){.opts{grid-template-columns:1fr 1fr}.board{grid-template-columns:1fr}}
 @media(max-width:600px){.load,.opts{grid-template-columns:1fr}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 12px;padding-inline-start:8em;text-align:start;white-space:normal}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;color:var(--mute)}.stack td:empty{display:none}}
 @media(prefers-reduced-motion:reduce){.meter i{transition:none}}
+
+/* Two themes, chosen with the Theme button: Daylight (default) and Dark Navy */
+:root[data-ui=day]{color-scheme:light;--bg:#eef2f7;--panel:#ffffff;--ink:#0f1e33;--mute:#55657a;--line:#cdd6e2;--soft:#f2f5f9;--ok:#1f7a45;--amber:#9a6200;--hdr:#0f1e33;--hdrInk:#ffffff;--ro:#0f1e33;--roInk:#ffffff}
+:root[data-ui=navy]{color-scheme:dark;--bg:#0a1730;--panel:#11244a;--ink:#e6edf8;--mute:#9db0cf;--line:#234272;--soft:#162e59;--ok:#4cc27f;--amber:#f0b24a;--hdr:#050f22;--hdrInk:#e6edf8;--ro:#050f22;--roInk:#e6edf8}
+:root[data-ui] header{background:var(--hdr);color:var(--hdrInk)}
+:root[data-ui] header .btn{color:var(--hdrInk)}
+:root[data-ui] .readout{background:var(--ro);color:var(--roInk)}
+:root[data-ui=navy] .meter{background:#1b345f}
+.themeBtn{min-height:38px}
+#who{flex:1 1 auto;text-align:right;margin-right:4px}
 </style>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head>
@@ -108,15 +118,15 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
     <div><label for="p">Password</label><input type="password" id="p" autocomplete="current-password" required></div>
     <p id="loginErr" role="alert"></p>
     <button class="btn" type="submit">Sign in</button>
+    <button class="btn ghost" type="button" id="themeBtn2" aria-label="Switch theme">Dark Navy</button>
   </form>
 </section>
 
 <main id="app" class="hide">
-  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><span style="display:flex;gap:8px"><button class="btn" id="install" type="button">Install app</button><button class="btn" id="logout" type="button">Sign out</button></span></div></header>
+  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><button class="btn themeBtn" id="themeBtn" type="button" aria-label="Switch theme">Dark Navy</button><span style="display:flex;gap:8px"><button class="btn" id="install" type="button">Install app</button><button class="btn" id="logout" type="button">Sign out</button></span></div></header>
 
   <div class="band">
-    <h1>Which notification mails went out?</h1>
-    <p class="muted" style="margin:8px 0 20px">Load the Access export of the group mailbox and your tracking list. The check runs in this browser only; nothing is uploaded anywhere.</p>
+    <h1 style="margin-bottom:20px">NOA Mail Checker for finding Missing NOA</h1>
 
     <div class="load">
       <div class="drop" id="dropMail">
@@ -151,27 +161,12 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
     <div class="opts">
       <div><label for="phrase">Subject text before the AWB</label><input type="text" id="phrase" value="Shipment Arrival Notification of"></div>
       <div><label for="ignFolder">Ignore folder containing</label><input type="text" id="ignFolder" value="Sent"></div>
-      <div><label for="dFrom">Mails from</label><input type="datetime-local" id="dFrom"></div>
-      <div><label for="dTo">Mails to</label><input type="datetime-local" id="dTo"></div>
+      <div><label for="dFrom">Mails from</label><input type="date" id="dFrom"></div>
+      <div><label for="dTo">Mails to</label><input type="date" id="dTo"></div>
       <button class="btn" type="button" id="run" disabled>Check</button>
     </div>
     <p id="msg" role="status"></p>
-    <p class="small muted" style="margin:4px 0 0"><a href="#" id="sample" style="color:inherit">Try it with sample data</a> · sample data is made up for testing only</p>
 
-    <details><summary>How to make the Access export (one-time setup)</summary>
-      <div class="card small">
-        <ol>
-          <li>In Access: <b>External Data → New Data Source → From Other Sources → Outlook Folder → Link</b>, and pick the folder where the group-mail copies land.</li>
-          <li>Create a query (e.g. <code>qryArrivalMails</code>):
-            <pre>SELECT [Subject], [Received]
-FROM [GroupInbox]
-WHERE [Subject] Like "*Shipment Arrival Notification of*";</pre></li>
-          <li>Run it, then <b>External Data → Export → Excel</b>, and tick <b>Save export steps</b>.</li>
-          <li>Each time you check: <b>External Data → Saved Exports → Run</b>, then load that file here as step 1.</li>
-        </ol>
-        <p style="margin:6px 0 0">The linked Outlook table works with classic Outlook on Windows. The .accdb file itself can't be read by a browser, so the export is the bridge.</p>
-      </div>
-    </details>
   </div>
 
   <div class="band hide" id="results" style="padding-top:0">
@@ -218,6 +213,13 @@ const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const say=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
 let mail=null,trk=null,R=null,tab='missing';
+/* ---- theme: Daylight / Dark Navy ---- */
+const themeColor=document.querySelector('meta[name=theme-color]');
+function setTheme(t){document.documentElement.dataset.ui=t;const next=t==='navy'?'Daylight':'Dark Navy';
+  for(const id of ['themeBtn','themeBtn2']){$(id).textContent=next;$(id).title='Switch to '+next+' theme'}
+  if(themeColor)themeColor.content=t==='navy'?'#050f22':'#0f1e33';try{localStorage.setItem('awbTheme',t)}catch(e){}}
+let th='day';try{th=localStorage.getItem('awbTheme')||'day'}catch(e){}setTheme(th==='navy'?'navy':'day');
+for(const id of ['themeBtn','themeBtn2'])$(id).addEventListener('click',()=>setTheme(document.documentElement.dataset.ui==='navy'?'day':'navy'));
 
 /* ---- login ---- */
 const show=u=>{$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent='Signed in as '+u};
@@ -348,7 +350,7 @@ function run(){
   const ph=$('phrase').value.trim();if(!ph){say('Enter the subject text that comes before the AWB.',true);return}
   const re=new RegExp(reEsc(ph).replace(/\s+/g,'\\s+')+'\\s*[:#\\-]?\\s*([A-Za-z0-9]+)','i');
   const si=+$('colSubj').value,di=+$('colDate').value,ai=+$('colAwb').value;
-  const from=$('dFrom').value?new Date($('dFrom').value):null,to=$('dTo').value?new Date($('dTo').value):null;
+  const from=$('dFrom').value?new Date($('dFrom').value+'T00:00:00'):null,to=$('dTo').value?new Date($('dTo').value+'T23:59:59.999'):null;
   const fi=+$('colFolder').value,ign=$('ignFolder').value.trim().toLowerCase();
   const ri=+$('colFrom').value,norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9@]/g,'');
   const sent=new Map(),counted=[];let matched=0,outRange=0,skipped=0;
@@ -440,19 +442,6 @@ $('dl').addEventListener('click',()=>{if(!R)return;
 let DL=null;
 try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(x=>{DL=x}).catch(()=>{})}catch(e){}
 
-/* ---- sample data (made up) ---- */
-$('sample').addEventListener('click',e=>{e.preventDefault();
-  const base=['123456789076','123456789077','123456789078','123456789079','123456789080','123456789081','123456789082','123456789083','123456789084','123456789085'];
-  const t='2026-11-24 ';
-  setMail({name:'Sample Access export',headers:['Subject','Received'],rows:[
-    ['Shipment Arrival Notification of 123456789076(Tracking number)',t+'09:02'],['Shipment Arrival Notification of 123456789077',t+'09:02'],
-    ['RE: Pickup request for Gulshan office',t+'09:05'],['Shipment Arrival Notification of 123456789078',t+'09:03'],
-    ['Shipment Arrival Notification of 123456789079',t+'09:03'],['Shipment Arrival Notification of 123456789081',t+'09:04'],
-    ['Shipment Arrival Notification of 123456789082',t+'09:04'],['Shipment Arrival Notification of 123456789082',t+'09:11'],
-    ['Weekly KPI report',t+'09:20'],['Shipment Arrival Notification of 123456789083',t+'09:05'],
-    ['Shipment Arrival Notification of 123456789085',t+'09:06'],['Shipment Arrival Notification of 123456789099',t+'09:06']]});
-  setTrk({name:'Sample tracking list',headers:['AWB','Consignee'],rows:base.map((a,i)=>[a,'Consignee '+(i+1)])});
-  run()});
 /* ---- PWA: offline cache + install button ---- */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
   try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
