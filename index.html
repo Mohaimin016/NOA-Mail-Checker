@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#16191c">
+<meta name="description" content="Check which Shipment Arrival Notification mails were sent and which AWBs are missing.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AWB Checker">
 <title>AWB Mail Checker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -50,7 +58,7 @@ header .btn{background:transparent;color:var(--panel);border-color:currentColor;
 .step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--panel);font-weight:700;font-size:14px;margin-right:8px}
 .fname{font-weight:600;overflow-wrap:anywhere}
 .pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;position:relative;z-index:1}
-.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:end;margin-top:16px}
+.opts{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr auto;gap:12px;align-items:end;margin-top:16px}
 details{margin-top:12px}summary{cursor:pointer;font-weight:600;min-height:32px}
 details .card{margin-top:8px}
 ol{padding-left:20px;margin:6px 0}code{background:var(--soft);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere;font-size:14px}
@@ -64,6 +72,9 @@ pre{overflow-x:auto;background:var(--soft);padding:10px;border-radius:8px;font-s
 .meter i{display:block;height:100%;background:#4cc27f;width:0;transition:width .6s}
 .strips{display:grid;gap:10px}
 .strip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.kpi{cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .12s,box-shadow .12s}
+.kpi:hover{box-shadow:0 0 0 2px var(--ink)}.kpi:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.kpi.on{box-shadow:0 0 0 3px var(--red)}.kpi.flash{transform:scale(.98)}
 .strip .n{font:700 28px "Inter Tight",sans-serif;white-space:nowrap}
 .strip.ok .n{color:var(--ok)}.strip.warn .n{color:var(--amber)}
 /* tabs + table */
@@ -82,7 +93,7 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
 #msg{min-height:1.4em;font-size:14px;margin:8px 0 0}
 #msg.err{color:var(--red)}
 .hide{display:none!important}
-@media(max-width:860px){.opts{grid-template-columns:1fr 1fr}#run{grid-column:1/-1}.board{grid-template-columns:1fr}}
+@media(max-width:860px){.opts{grid-template-columns:1fr 1fr}.board{grid-template-columns:1fr}}
 @media(max-width:600px){.load,.opts{grid-template-columns:1fr}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 12px;padding-inline-start:8em;text-align:start;white-space:normal}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;color:var(--mute)}.stack td:empty{display:none}}
 @media(prefers-reduced-motion:reduce){.meter i{transition:none}}
 </style>
@@ -101,7 +112,7 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
 </section>
 
 <main id="app" class="hide">
-  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><button class="btn" id="logout" type="button">Sign out</button></div></header>
+  <header><div class="band"><b>AWB Mail Checker</b><span class="small" id="who"></span><span style="display:flex;gap:8px"><button class="btn hide" id="install" type="button">Install app</button><button class="btn" id="logout" type="button">Sign out</button></span></div></header>
 
   <div class="band">
     <h1>Which notification mails went out?</h1>
@@ -140,7 +151,6 @@ td.t{white-space:nowrap;font-variant-numeric:tabular-nums}
     <div class="opts">
       <div><label for="phrase">Subject text before the AWB</label><input type="text" id="phrase" value="Shipment Arrival Notification of"></div>
       <div><label for="ignFolder">Ignore folder containing</label><input type="text" id="ignFolder" value="Sent"></div>
-      <div><label for="ignFrom">Ignore mails from (comma-separated)</label><input type="text" id="ignFrom" value="Asaduzzaman, Md.Sohel"></div>
       <div><label for="dFrom">Mails from</label><input type="datetime-local" id="dFrom"></div>
       <div><label for="dTo">Mails to</label><input type="datetime-local" id="dTo"></div>
       <button class="btn" type="button" id="run" disabled>Check</button>
@@ -165,16 +175,17 @@ WHERE [Subject] Like "*Shipment Arrival Notification of*";</pre></li>
   </div>
 
   <div class="band hide" id="results" style="padding-top:0">
+    <p class="small muted" style="margin:0 0 10px">Click a KPI to show its list. <b>Double-click a KPI to download that list as Excel.</b></p>
     <div class="board">
-      <div class="readout" id="readout">
+      <div class="readout kpi" id="readout" data-kpi="missing" tabindex="0" role="button" title="Double-click to download the Missing list">
         <div><div class="small" style="opacity:.75">Missing: no mail found</div><div class="big" id="nMissing">0</div><div id="ofLine" style="opacity:.85"></div></div>
         <div><div class="meter"><i id="meter"></i></div><div class="small" id="pctLine" style="margin-top:6px;opacity:.85"></div></div>
       </div>
       <div class="strips">
-        <div class="strip ok"><div><b>Shared</b><div class="small muted">In your list and a mail reached the group</div></div><span class="n" id="nShared">0</span></div>
-        <div class="strip warn"><div><b>Extra</b><div class="small muted">Mail sent, but AWB not in your list</div></div><span class="n" id="nExtra">0</span></div>
-        <div class="strip warn"><div><b>Sent more than once</b><div class="small muted">Same AWB in two or more mails</div></div><span class="n" id="nDup">0</span></div>
-        <div class="strip"><div><b>Mails scanned</b><div class="small muted" id="scanLine"></div></div><span class="n" id="nScan">0</span></div>
+        <div class="strip ok kpi" data-kpi="shared" tabindex="0" role="button" title="Double-click to download the Shared list"><div><b>Shared</b><div class="small muted">In your list and a mail reached the group</div></div><span class="n" id="nShared">0</span></div>
+        <div class="strip warn kpi" data-kpi="extra" tabindex="0" role="button" title="Double-click to download the Extra list"><div><b>Extra</b><div class="small muted">Mail sent, but AWB not in your list</div></div><span class="n" id="nExtra">0</span></div>
+        <div class="strip warn kpi" data-kpi="dup" tabindex="0" role="button" title="Double-click to download the Sent more than once list"><div><b>Sent more than once</b><div class="small muted">Same AWB in two or more mails</div></div><span class="n" id="nDup">0</span></div>
+        <div class="strip kpi" data-kpi="scan" tabindex="0" role="button" title="Double-click to download the mails counted"><div><b>Mails scanned</b><div class="small muted" id="scanLine"></div></div><span class="n" id="nScan">0</span></div>
       </div>
     </div>
 
@@ -200,7 +211,6 @@ const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const say=(t,err)=>{$('msg').textContent=t;$('msg').className=err?'err':''};
 let mail=null,trk=null,R=null,tab='missing';
-try{const v=localStorage.getItem('awbIgnFrom');if(v!==null)$('ignFrom').value=v}catch(e){}
 
 /* ---- login ---- */
 const show=u=>{$('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent='Signed in as '+u};
@@ -330,19 +340,16 @@ function run(){
   const from=$('dFrom').value?new Date($('dFrom').value):null,to=$('dTo').value?new Date($('dTo').value):null;
   const fi=+$('colFolder').value,ign=$('ignFolder').value.trim().toLowerCase();
   const ri=+$('colFrom').value,norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9@]/g,'');
-  const names=$('ignFrom').value.split(/[,;\n]/).map(norm).filter(Boolean);
-  try{localStorage.setItem('awbIgnFrom',$('ignFrom').value)}catch(e){}
-  const sent=new Map();let matched=0,outRange=0,skipped=0,fromSkipped=0;
+  const sent=new Map(),counted=[];let matched=0,outRange=0,skipped=0;
   for(const r of mail.rows){const subj=String(r[si]??''),m=subj.match(re);if(!m)continue;
     if(ign&&(fi>=0?String(r[fi]??'').toLowerCase().includes(ign):r.some((c,i)=>i!==si&&/^sent items$/i.test(String(c).trim())))){skipped++;continue}
-    if(names.length&&ri>=0&&names.some(n=>norm(r[ri]).includes(n))){fromSkipped++;continue}
     const d=di>=0?parseDate(r[di]):null;
     if(d&&((from&&d<from)||(to&&d>to))){outRange++;continue}
-    matched++;const k=key(m[1]);if(!sent.has(k))sent.set(k,{awb:m[1],mails:[]});sent.get(k).mails.push({subj,d})}
+    matched++;counted.push({awb:m[1],subj,d,from:ri>=0?String(r[ri]??''):''});const k=key(m[1]);if(!sent.has(k))sent.set(k,{awb:m[1],mails:[]});sent.get(k).mails.push({subj,d})}
   const list=new Map();
   trk.rows.forEach((r,i)=>{const raw=String(r[ai]??'').trim(),k=key(raw);if(k&&!list.has(k))list.set(k,{awb:raw,row:i+(trk.headers[0].startsWith('Column ')?1:2)})});
   const sortT=a=>a.sort((x,y)=>(x.d?.getTime()||0)-(y.d?.getTime()||0));
-  R={total:mail.rows.length,matched,outRange,skipped,fromSkipped,list:list.size,
+  R={total:mail.rows.length,matched,outRange,skipped,list:list.size,scan:sortT(counted),
     missing:[...list].filter(([k])=>!sent.has(k)).map(([,v])=>v),
     shared:[...list].filter(([k])=>sent.has(k)).map(([k,v])=>{const ms=sortT(sent.get(k).mails);return{awb:v.awb,first:fmt(ms[0].d),times:ms.length}}),
     extra:[...sent].filter(([k])=>!list.has(k)).map(([,v])=>{const ms=sortT(v.mails);return{awb:v.awb,first:fmt(ms[0].d),subj:ms[0].subj,times:ms.length}}),
@@ -353,9 +360,8 @@ function run(){
   const pct=R.list?Math.round(R.shared.length/R.list*1000)/10:0;
   $('meter').style.width=pct+'%';$('pctLine').textContent=`${pct}% shared (${R.shared.length} of ${R.list})`;
   $('nShared').textContent=R.shared.length;$('nExtra').textContent=R.extra.length;$('nDup').textContent=R.dup.length;$('nScan').textContent=R.matched;
-  $('scanLine').textContent=`${R.matched} notification mails of ${R.total} rows`+(R.skipped?`; ${R.skipped} from Sent Items ignored`:'')+(R.fromSkipped?`; ${R.fromSkipped} from ignored senders`:'')+(R.outRange?`; ${R.outRange} outside the date range`:'');
-  if(names.length&&ri<0)say('No From column found, so "Ignore mails from" was not applied. Pick the From column under step 1.',true);
-  else if(!R.matched)say('No subjects matched "'+ph+'". Check the subject column and the subject text.',true);
+  $('scanLine').textContent=`${R.matched} notification mails of ${R.total} rows`+(R.skipped?`; ${R.skipped} from Sent Items ignored`:'')+(R.outRange?`; ${R.outRange} outside the date range`:'');
+  if(!R.matched)say('No subjects matched "'+ph+'". Check the subject column and the subject text.',true);
   else if(fi<0&&!R.skipped&&R.dup.length&&R.dup.length>=R.shared.length*0.8)say('Almost every AWB appears twice. Your paste may include Sent Items: add the "In Folder" column in Outlook (or search only the inbox) so sent copies can be ignored.',true);
   else say(R.missing.length?`${R.missing.length} AWB without a mail. See the Missing tab.`:'All AWBs in your list have a mail.');
   tab='missing';drawTabs();draw();$('results').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
@@ -366,8 +372,9 @@ const VIEWS={
   missing:{label:'Missing',cols:['Tracking number','Row in your file'],row:r=>[r.awb,r.row]},
   shared:{label:'Shared',cols:['Tracking number','First mail received','Mails'],row:r=>[r.awb,r.first,r.times]},
   extra:{label:'Extra',cols:['Tracking number','First mail received','Mails','Subject'],row:r=>[r.awb,r.first,r.times,r.subj]},
-  dup:{label:'Sent more than once',cols:['Tracking number','Mails','Received','In your list'],row:r=>[r.awb,r.times,r.when,r.inList]}};
-function drawTabs(){$('tabs').innerHTML=Object.entries(VIEWS).map(([k,v])=>`<button class="tab" role="tab" type="button" data-k="${k}" aria-selected="${k===tab}">${v.label} (${R[k].length})</button>`).join('')}
+  dup:{label:'Sent more than once',cols:['Tracking number','Mails','Received','In your list'],row:r=>[r.awb,r.times,r.when,r.inList]},
+  scan:{label:'Mails counted',cols:['Tracking number','From','Received','Subject'],row:r=>[r.awb,r.from,fmt(r.d),r.subj]}};
+function drawTabs(){document.querySelectorAll('.kpi').forEach(el=>el.classList.toggle('on',el.dataset.kpi===tab));$('tabs').innerHTML=Object.entries(VIEWS).map(([k,v])=>`<button class="tab" role="tab" type="button" data-k="${k}" aria-selected="${k===tab}">${v.label} (${R[k].length})</button>`).join('')}
 $('tabs').addEventListener('click',e=>{const b=e.target.closest('.tab');if(!b)return;tab=b.dataset.k;drawTabs();draw()});
 const viewRows=()=>{const q=$('q').value.trim().toLowerCase(),v=VIEWS[tab];return R[tab].map(v.row).filter(r=>!q||r.join(' ').toLowerCase().includes(q))};
 function draw(){const v=VIEWS[tab],rows=viewRows();
@@ -393,21 +400,32 @@ function zip(files){const te=new TextEncoder(),parts=[],cen=[];let off=0;
   return new Blob([...parts,...cen,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
 const xe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
 const sheetXml=rows=>`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="22" customWidth="1"/><col min="2" max="4" width="24" customWidth="1"/></cols><sheetData>${rows.map((r,i)=>`<row r="${i+1}">${r.map(c=>typeof c==='number'?`<c t="n"${i?'':' s="1"'}><v>${c}</v></c>`:`<c t="inlineStr"${i?'':' s="1"'}><is><t xml:space="preserve">${xe(c)}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`;
-$('dl').addEventListener('click',()=>{if(!R)return;
-  const sheets=[['Summary',[['Item','Count'],['Tracking numbers in list',R.list],['Shared',R.shared.length],['Missing',R.missing.length],['Extra (not in list)',R.extra.length],['Sent more than once',R.dup.length],['Notification mails scanned',R.matched],['Sent Items mails ignored',R.skipped],['Mails from ignored senders',R.fromSkipped],['Checked at',fmt(new Date())]]],
-    ...Object.entries(VIEWS).map(([k,v])=>[v.label,[v.cols,...R[k].map(v.row)]])];
-  const ns='http://schemas.openxmlformats.org/';
-  const files=[['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="${ns}package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
+function buildFiles(sheets,ns){
+  return[['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="${ns}package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
     ['_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${ns}package/2006/relationships"><Relationship Id="rId1" Type="${ns}officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
     ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${ns}spreadsheetml/2006/main" xmlns:r="${ns}officeDocument/2006/relationships"><sheets>${sheets.map((s,i)=>`<sheet name="${xe(s[0])}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`],
     ['xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${ns}package/2006/relationships">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${ns}officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="${ns}officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
     ['xl/styles.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${ns}spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>`],
     ...sheets.map((s,i)=>[`xl/worksheets/sheet${i+1}.xml`,sheetXml(s[1])])];
-  const d=new Date(),fname=`AWB-mail-check_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.xlsx`,blob=zip(files);
-  if(DL){DL.save({filename:fname,data:blob}).then(()=>say('Excel file saved.')).catch(e=>say(e&&e.code==='declined'?'Download cancelled.':'Download is not available here. Use Copy for Excel instead.',!(e&&e.code==='declined')));return}
+}
+function exportXlsx(sheets,label){
+  const ns='http://schemas.openxmlformats.org/';
+  const files=buildFiles(sheets,ns);
+  const d=new Date(),fname=`AWB-${label}_${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.xlsx`,blob=zip(files);
+  if(DL){DL.save({filename:fname,data:blob}).then(()=>say(fname+' saved.')).catch(e=>say(e&&e.code==='declined'?'Download cancelled.':'Download is not available here. Use Copy for Excel instead.',!(e&&e.code==='declined')));return}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;
-    document.body.appendChild(a);a.click();a.remove();say('Excel file downloaded.')}
-  catch(e){say('Download was blocked here. Use Copy for Excel instead.',true)}});
+    document.body.appendChild(a);a.click();a.remove();say(fname+' downloaded.')}
+  catch(e){say('Download was blocked here. Use Copy for Excel instead.',true)}}
+function kpiDl(k){if(!R)return;const v=VIEWS[k];exportXlsx([[v.label,[v.cols,...R[k].map(v.row)]]],v.label.replace(/\s+/g,'-'))}
+document.querySelectorAll('.kpi').forEach(el=>{
+  el.addEventListener('click',()=>{if(!R)return;tab=el.dataset.kpi;drawTabs();draw()});
+  el.addEventListener('dblclick',e=>{e.preventDefault();el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),150);kpiDl(el.dataset.kpi)});
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();kpiDl(el.dataset.kpi)}})});
+$('dl').addEventListener('click',()=>{if(!R)return;
+  const sheets=[['Summary',[['Item','Count'],['Tracking numbers in list',R.list],['Shared',R.shared.length],['Missing',R.missing.length],['Extra (not in list)',R.extra.length],['Sent more than once',R.dup.length],['Notification mails scanned',R.matched],['Sent Items mails ignored',R.skipped],['Checked at',fmt(new Date())]]],
+    ...Object.entries(VIEWS).map(([k,v])=>[v.label,[v.cols,...R[k].map(v.row)]])];
+  exportXlsx(sheets,'mail-check');});
+
 let DL=null;
 try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(x=>{DL=x}).catch(()=>{})}catch(e){}
 
@@ -424,6 +442,13 @@ $('sample').addEventListener('click',e=>{e.preventDefault();
     ['Shipment Arrival Notification of 123456789085',t+'09:06'],['Shipment Arrival Notification of 123456789099',t+'09:06']]});
   setTrk({name:'Sample tracking list',headers:['AWB','Consignee'],rows:base.map((a,i)=>[a,'Consignee '+(i+1)])});
   run()});
+/* ---- PWA: offline cache + install button ---- */
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}}
+let deferred=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('install').classList.remove('hide')});
+$('install').addEventListener('click',async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;$('install').classList.add('hide')});
+window.addEventListener('appinstalled',()=>$('install').classList.add('hide'));
 }
 </script>
 </body>
